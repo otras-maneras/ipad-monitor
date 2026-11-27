@@ -1,0 +1,18 @@
+{
+  "capture": {
+    "monitor": 1,
+    "left": 0,
+    "top": 0,
+    "width": 1024,
+    "height": 768,
+    "target_width": 1024,
+    "target_height": 768,
+    "full_monitor": false
+  },
+  "preset": "balanced",
+  "jpeg_quality": 52,
+  "target_fps": 12,
+  "resize_method": "bilinear",
+  "jpeg_subsample": 2,
+  "library_dir": "library"
+}

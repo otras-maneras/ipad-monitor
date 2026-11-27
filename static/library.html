@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>iPad Monitor — Biblioteca</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="library-body">
+  <div class="topbar">
+    <a href="/">← Inicio</a>
+    <span>Biblioteca</span>
+    <a href="#" id="refresh-btn">Actualizar</a>
+  </div>
+
+  <div class="library-wrap">
+    <div class="note library-note">
+      <strong>Leer en iBooks:</strong> tocá un libro → cuando se abra, <strong>Compartir</strong> → <strong>Abrir en iBooks</strong>.
+      Los libros deben estar en la carpeta <code>library</code> del PC (EPUB o PDF).
+    </div>
+
+    <p id="library-status" class="page-status"></p>
+
+    <ul id="book-list" class="library-list"></ul>
+
+    <p id="library-empty" class="library-empty hidden">
+      No hay libros todavía. Copiá archivos <strong>.epub</strong> o <strong>.pdf</strong> en la carpeta
+      <strong>library</strong> del PC y tocá Actualizar.
+    </p>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    var listEl = document.getElementById("book-list");
+    var emptyEl = document.getElementById("library-empty");
+    var statusEl = document.getElementById("library-status");
+
+    function kindLabel(kind) {
+      if (kind === "epub") return "EPUB";
+      if (kind === "pdf") return "PDF";
+      return kind.toUpperCase();
+    }
+
+    function loadBooks() {
+      MiniPad.showStatus("library-status", "Cargando…", "info");
+      MiniPad.get("/api/library", function (err, data) {
+        if (err || !data) {
+          MiniPad.showStatus("library-status", "No se pudo cargar la biblioteca.", "error");
+          return;
+        }
+
+        MiniPad.showStatus("library-status", "", "info");
+        listEl.innerHTML = "";
+
+        if (!data.books || data.books.length === 0) {
+          emptyEl.className = "library-empty";
+          return;
+        }
+
+        emptyEl.className = "library-empty hidden";
+
+        for (var i = 0; i < data.books.length; i++) {
+          var book = data.books[i];
+          var li = document.createElement("li");
+          li.className = "library-item";
+
+          var link = document.createElement("a");
+          link.className = "library-link";
+          link.href = book.url;
+          link.setAttribute("download", book.name);
+
+          var title = document.createElement("span");
+          title.className = "library-title";
+          title.textContent = book.name;
+
+          var meta = document.createElement("span");
+          meta.className = "library-meta";
+          meta.textContent = kindLabel(book.kind) + " · " + book.size_label;
+
+          link.appendChild(title);
+          link.appendChild(meta);
+          li.appendChild(link);
+          listEl.appendChild(li);
+        }
+      });
+    }
+
+    document.getElementById("refresh-btn").onclick = function (e) {
+      e.preventDefault();
+      loadBooks();
+    };
+
+    loadBooks();
+  </script>
+</body>
+</html>

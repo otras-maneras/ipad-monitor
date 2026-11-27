@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>iPad Monitor — Reproducir</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="cinema-watch-body">
+  <div class="topbar cinema-watch-topbar">
+    <a href="/cinema">← Cine</a>
+    <span id="watch-title">Reproducir</span>
+    <span></span>
+  </div>
+
+  <div class="cinema-player-wrap">
+    <video
+      id="player"
+      class="cinema-player"
+      controls
+      playsinline
+      webkit-playsinline="true"
+      preload="auto"
+      x-webkit-airplay="allow"
+    ></video>
+    <p id="watch-status" class="cinema-watch-status">Cargando…</p>
+  </div>
+
+  <div class="cinema-watch-downloads" id="watch-downloads"></div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    function filenameFromPath() {
+      var parts = window.location.pathname.split("/");
+      var raw = parts[parts.length - 1] || "";
+      try {
+        return decodeURIComponent(raw);
+      } catch (e) {
+        return raw;
+      }
+    }
+
+    function apiVideoUrl(name) {
+      return "/api/cinema/" + encodeURIComponent(name);
+    }
+
+    var filename = filenameFromPath();
+    var player = document.getElementById("player");
+    var statusEl = document.getElementById("watch-status");
+    var downloadsEl = document.getElementById("watch-downloads");
+
+    document.getElementById("watch-title").textContent = filename || "Video";
+
+    player.onerror = function () {
+      statusEl.textContent = "No se pudo reproducir. Usá MP4 con H.264/AAC o probá descargar y VLC.";
+    };
+
+    player.onloadedmetadata = function () {
+      if (statusEl.textContent === "Cargando…") {
+        statusEl.textContent = "";
+      }
+    };
+
+    if (!filename) {
+      statusEl.textContent = "Archivo no especificado.";
+    } else {
+      MiniPad.get(apiVideoUrl(filename), function (err, info) {
+        if (err || !info) {
+          statusEl.textContent = "No se encontró el video en el servidor.";
+          return;
+        }
+
+        statusEl.textContent = info.has_subs ? "Subtítulos: " + info.subs_name : "Reproduciendo…";
+
+        if (info.has_subs && info.subs_url) {
+          var track = document.createElement("track");
+          track.kind = "subtitles";
+          track.src = info.subs_url;
+          track.srclang = "es";
+          track.label = "Subtítulos";
+          track.setAttribute("default", "default");
+          player.appendChild(track);
+        }
+
+        player.src = info.stream_url;
+        player.load();
+
+        var note = document.createElement("p");
+        note.className = "cinema-offline-note";
+        note.innerHTML = "<strong>iPad:</strong> si no reproduce, tocá <strong>↓ Video</strong>. Safari puede abrir el reproductor nativo; desde ahí podés guardar o abrir en VLC.";
+
+        var dlRow = document.createElement("div");
+        dlRow.className = "cinema-actions cinema-watch-dl";
+
+        var dlVideo = document.createElement("a");
+        dlVideo.className = "cinema-action cinema-action-primary";
+        dlVideo.href = info.download_url;
+        dlVideo.textContent = "↓ Video (guardar)";
+
+        dlRow.appendChild(dlVideo);
+
+        if (info.has_subs && info.subs_download_url) {
+          var dlSubs = document.createElement("a");
+          dlSubs.className = "cinema-action";
+          dlSubs.href = info.subs_download_url;
+          dlSubs.textContent = "↓ Subs";
+          dlRow.appendChild(dlSubs);
+        }
+
+        var openStream = document.createElement("a");
+        openStream.className = "cinema-action";
+        openStream.href = info.stream_url;
+        openStream.textContent = "Abrir en Safari";
+        dlRow.appendChild(openStream);
+
+        downloadsEl.appendChild(note);
+        downloadsEl.appendChild(dlRow);
+      });
+    }
+  </script>
+</body>
+</html>

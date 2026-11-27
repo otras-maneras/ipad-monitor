@@ -1,0 +1,7 @@
+# iPad Monitor web y emisores en Windows.
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+mss>=9.0.1
+Pillow>=10.0.0
+pyautogui>=0.9.54; sys_platform == "win32"
+psutil>=5.9.0

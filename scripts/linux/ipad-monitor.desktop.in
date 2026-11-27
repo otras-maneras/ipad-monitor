@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=iPad Monitor
+Comment=Usar el iPad como pantalla extendida por Wi-Fi o USB
+Exec=@TERMINAL@ @ROOT@/scripts/linux/ipad-monitor.sh
+Icon=input-tablet
+Terminal=false
+Categories=Utility;

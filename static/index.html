@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>iPad Monitor</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="index-body">
+  <div class="index-wrap">
+    <header class="index-header">
+      <div class="index-title-row">
+        <h1>iPad Monitor</h1>
+        <span id="index-status" class="index-status">…</span>
+      </div>
+      <p id="server-url" class="index-url"></p>
+    </header>
+
+    <section class="index-widget" id="index-widget">
+      <div class="index-stats">
+        <div class="index-stat">
+          <div class="index-stat-label">CPU</div>
+          <div class="index-stat-value" id="stat-cpu">--</div>
+        </div>
+        <div class="index-stat">
+          <div class="index-stat-label">RAM</div>
+          <div class="index-stat-value" id="stat-ram">--</div>
+        </div>
+        <div class="index-stat">
+          <div class="index-stat-label">Stream</div>
+          <div class="index-stat-value" id="stat-fps">--</div>
+        </div>
+      </div>
+    </section>
+
+    <nav class="index-main">
+      <a class="index-btn index-btn-primary" href="/kiosk">
+        <span class="index-btn-icon">▣</span>
+        <span class="index-btn-label">Espejo</span>
+      </a>
+      <a class="index-btn" href="/touchpad">
+        <span class="index-btn-icon">◎</span>
+        <span class="index-btn-label">Control</span>
+      </a>
+      <a class="index-btn" href="/keyboard">
+        <span class="index-btn-icon">⌨</span>
+        <span class="index-btn-label">Teclado</span>
+      </a>
+      <a class="index-btn" href="/library">
+        <span class="index-btn-icon">📖</span>
+        <span class="index-btn-label">Biblioteca</span>
+      </a>
+      <a class="index-btn" href="/cinema">
+        <span class="index-btn-icon">🎬</span>
+        <span class="index-btn-label">Cine</span>
+      </a>
+      <a class="index-btn" href="/setup">
+        <span class="index-btn-icon">⚙</span>
+        <span class="index-btn-label">Config</span>
+      </a>
+      <a class="index-btn" href="/dashboard">
+        <span class="index-btn-icon">📊</span>
+        <span class="index-btn-label">Stats</span>
+      </a>
+    </nav>
+
+    <footer class="index-footer">
+      iPad Monitor · iPad Mini 1
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    var statusEl = document.getElementById("index-status");
+    var urlEl = document.getElementById("server-url");
+    var widgetEl = document.getElementById("index-widget");
+
+    function setStatus(text, kind) {
+      statusEl.textContent = text;
+      statusEl.className = "index-status" + (kind ? " index-status-" + kind : "");
+    }
+
+    function updateStats() {
+      MiniPad.get("/api/stats", function (err, data) {
+        if (err || !data) {
+          widgetEl.style.display = "none";
+          return;
+        }
+        widgetEl.style.display = "block";
+        document.getElementById("stat-cpu").textContent = (data.cpu && data.cpu.percent ? Math.round(data.cpu.percent) : "--") + "%";
+        document.getElementById("stat-ram").textContent = (data.memory && data.memory.percent ? Math.round(data.memory.percent) : "--") + "%";
+        var fps = data.stream && data.stream.fps_actual ? data.stream.fps_actual : 0;
+        document.getElementById("stat-fps").textContent = fps ? Math.round(fps * 10) / 10 + " fps" : "--";
+      });
+    }
+
+    MiniPad.get("/api/info", function (err, info) {
+      if (err || !info) {
+        setStatus("Sin conexión", "error");
+        urlEl.textContent = "¿iPad Monitor corriendo en el PC?";
+        return;
+      }
+
+      if (info.local_url) {
+        urlEl.textContent = info.local_url;
+      }
+
+      var stream = info.stream && info.stream.stats ? info.stream.stats : {};
+      if (stream.sequence > 0) {
+        setStatus("OK", "ok");
+      } else {
+        setStatus("Esperando", "warn");
+      }
+
+      updateStats();
+      setInterval(updateStats, 5000);
+    });
+  </script>
+</body>
+</html>

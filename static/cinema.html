@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>iPad Monitor — Cine</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="cinema-body">
+  <div class="topbar">
+    <a href="/">← Inicio</a>
+    <span>Cine</span>
+    <a href="#" id="refresh-btn">Actualizar</a>
+  </div>
+
+  <div class="cinema-wrap">
+    <div class="note cinema-note">
+      <strong>Streaming:</strong> tocá <strong>Ver</strong> (requiere iPad Monitor en el PC).<br>
+      <strong>Offline:</strong> tocá <strong>↓ Video</strong> y <strong>↓ Subs</strong> (Safari iOS 9 no usa descarga automática; se abre el reproductor → guardar o VLC).<br>
+      Archivos en <code>library/videos/</code> del PC (MP4 + VTT opcional).
+    </div>
+
+    <p id="cinema-status" class="page-status"></p>
+    <ul id="video-list" class="cinema-list"></ul>
+
+    <p id="cinema-empty" class="cinema-empty hidden">
+      No hay videos. Copiá archivos <strong>.mp4</strong> (y opcionalmente <strong>.vtt</strong>) en
+      <strong>library/videos/</strong> del PC y tocá Actualizar.
+    </p>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    var listEl = document.getElementById("video-list");
+    var emptyEl = document.getElementById("cinema-empty");
+
+    function loadVideos() {
+      MiniPad.showStatus("cinema-status", "Cargando…", "info");
+      MiniPad.get("/api/cinema", function (err, data) {
+        if (err || !data) {
+          MiniPad.showStatus("cinema-status", "No se pudo cargar la lista.", "error");
+          return;
+        }
+
+        MiniPad.showStatus("cinema-status", "", "info");
+        listEl.innerHTML = "";
+
+        if (!data.videos || data.videos.length === 0) {
+          emptyEl.className = "cinema-empty";
+          return;
+        }
+
+        emptyEl.className = "cinema-empty hidden";
+
+        for (var i = 0; i < data.videos.length; i++) {
+          var v = data.videos[i];
+          var li = document.createElement("li");
+          li.className = "cinema-item";
+
+          var head = document.createElement("div");
+          head.className = "cinema-item-head";
+
+          var title = document.createElement("span");
+          title.className = "cinema-title";
+          title.textContent = v.name;
+
+          var meta = document.createElement("span");
+          meta.className = "cinema-meta";
+          meta.textContent = v.size_label + (v.has_subs ? " · Subs" : "");
+
+          head.appendChild(title);
+          head.appendChild(meta);
+
+          var actions = document.createElement("div");
+          actions.className = "cinema-actions";
+
+          var watch = document.createElement("a");
+          watch.className = "cinema-action cinema-action-primary";
+          watch.href = v.watch_url;
+          watch.textContent = "▶ Ver";
+
+          var dlVideo = document.createElement("a");
+          dlVideo.className = "cinema-action";
+          dlVideo.href = v.download_url;
+          dlVideo.textContent = "↓ Video";
+
+          actions.appendChild(watch);
+          actions.appendChild(dlVideo);
+
+          if (v.has_subs && v.subs_download_url) {
+            var dlSubs = document.createElement("a");
+            dlSubs.className = "cinema-action";
+            dlSubs.href = v.subs_download_url;
+            dlSubs.textContent = "↓ Subs";
+            actions.appendChild(dlSubs);
+          }
+
+          li.appendChild(head);
+          li.appendChild(actions);
+          listEl.appendChild(li);
+        }
+      });
+    }
+
+    document.getElementById("refresh-btn").onclick = function (e) {
+      e.preventDefault();
+      loadVideos();
+    };
+
+    loadVideos();
+  </script>
+</body>
+</html>

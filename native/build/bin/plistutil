@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+"""Local plistutil compatibility wrapper for Theos, using Python plistlib."""
+import argparse, plistlib, sys
+p = argparse.ArgumentParser()
+p.add_argument('-i', required=True)
+p.add_argument('-o', required=True)
+p.add_argument('-f', choices=['bin','xml'], default='bin')
+a=p.parse_args()
+with open(a.i, 'rb') as f:
+    obj=plistlib.load(f)
+data=plistlib.dumps(obj, fmt=plistlib.FMT_BINARY if a.f=='bin' else plistlib.FMT_XML, sort_keys=False)
+with open(a.o, 'wb') as f:
+    f.write(data)

@@ -1,0 +1,9 @@
+Package: com.minipad.ipadscreenh264
+Name: iPad Monitor
+Version: 0.3.1
+Architecture: iphoneos-arm
+Description: Experimental iPad Monitor H.264 Wi-Fi display client.
+Maintainer: George
+Author: George
+Section: Utilities
+Depends: firmware (>= 9.0)

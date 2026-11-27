@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>iPad Monitor · PIN</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .login-form { margin: 24px auto 0; max-width: 320px; text-align: center; }
+    .login-pin {
+      width: 100%; box-sizing: border-box; font-size: 40px; letter-spacing: 12px;
+      text-align: center; padding: 14px; border-radius: 12px; border: 1px solid #3a4a63;
+      background: #111a28; color: #fff; -webkit-appearance: none;
+    }
+    .login-send { margin-top: 16px; width: 100%; }
+    .login-error { color: #ff8a8a; min-height: 22px; margin-top: 12px; }
+  </style>
+</head>
+<body class="start-body">
+  <div class="start-wrap">
+    <header class="start-header">
+      <h1>iPad Monitor</h1>
+      <p class="start-status">Ingresá el PIN que muestra la ventana del servidor en la PC.</p>
+    </header>
+    <form class="login-form" id="login-form" autocomplete="off">
+      <input class="login-pin" id="pin" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="4" autofocus>
+      <button class="start-btn start-btn-primary login-send" type="submit">Entrar</button>
+      <p class="login-error" id="login-error"></p>
+    </form>
+  </div>
+  <script src="/static/app.js"></script>
+  <script>
+    (function () {
+      var form = document.getElementById("login-form");
+      var pin = document.getElementById("pin");
+      var error = document.getElementById("login-error");
+
+      function nextPage() {
+        var match = /[?&]next=([^&]*)/.exec(window.location.search);
+        var next = match ? decodeURIComponent(match[1]) : "/";
+        // Solo rutas de este servidor.
+        return next.charAt(0) === "/" && next.charAt(1) !== "/" ? next : "/";
+      }
+
+      form.onsubmit = function (e) {
+        e.preventDefault();
+        error.textContent = "";
+        MiniPad.post("/api/login", { pin: pin.value }, function (err) {
+          if (err) {
+            error.textContent = err.message;
+            pin.value = "";
+            pin.focus();
+            return;
+          }
+          window.location.href = nextPage();
+        });
+      };
+    })();
+  </script>
+</body>
+</html>

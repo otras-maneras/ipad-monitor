@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>iPad Monitor — Teclado</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="keyboard-body">
+  <div class="topbar keyboard-topbar" id="topbar">
+    <a href="/">← Inicio</a>
+    <span>Teclado</span>
+    <span id="kbd-status" class="touch-status">Listo</span>
+  </div>
+
+  <div class="keyboard-shell">
+    <div class="kbd-input-wrap">
+      <input type="text" id="native-input" class="kbd-native-input"
+        placeholder="Tocá acá y usá el teclado de iOS…"
+        autocomplete="off" autocorrect="off" spellcheck="false" autocapitalize="none">
+      <div class="kbd-input-actions">
+        <button type="button" class="btn kbd-action-main" id="send-btn">Enviar todo</button>
+        <button type="button" class="btn btn-secondary kbd-action" id="enter-btn">↵</button>
+        <button type="button" class="btn btn-secondary kbd-action" id="clear-btn">✕</button>
+      </div>
+    </div>
+
+    <div class="kbd-hint">Tocá el cuadro, escribí con el teclado de iOS y el texto se manda al PC automáticamente.</div>
+
+    <div class="kbd-phrases" id="phrases"></div>
+
+    <div class="kbd-macros" id="macros"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    var input = document.getElementById("native-input");
+    var statusEl = document.getElementById("kbd-status");
+    var lastValue = "";
+
+    var phrases = ["https://", "@gmail.com", "Gracias", "Hola", "Buenos días", "Por favor"];
+
+    var macros = [
+      { label: "Copiar", keys: ["ctrl", "c"] },
+      { label: "Pegar", keys: ["ctrl", "v"] },
+      { label: "Deshacer", keys: ["ctrl", "z"] },
+      { label: "Alt+Tab", keys: ["alt", "tab"] },
+      { label: "Esc", keys: ["esc"] },
+      { label: "Borrar", keys: ["backspace"] },
+      { label: "Win", keys: ["win"] },
+      { label: "Enter", keys: ["enter"] }
+    ];
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    function sendKey(key) {
+      MiniPad.post("/api/key", { key: key }, function () { setStatus("Listo"); });
+    }
+
+    function sendHotkey(keys) {
+      MiniPad.post("/api/hotkey", { keys: keys }, function () { setStatus("Listo"); });
+    }
+
+    function sendType(text) {
+      if (!text) return;
+      MiniPad.post("/api/type", { text: text }, function () { setStatus("Listo"); });
+    }
+
+    function sendDelta() {
+      var current = input.value;
+      if (current === lastValue) return;
+
+      if (current.length > lastValue.length) {
+        var added = current.substring(lastValue.length);
+        sendType(added);
+      } else {
+        var removed = lastValue.length - current.length;
+        for (var i = 0; i < removed; i++) {
+          sendKey("backspace");
+        }
+      }
+      lastValue = current;
+    }
+
+    function sendAll() {
+      sendType(input.value);
+      lastValue = input.value;
+    }
+
+    function clearInput() {
+      input.value = "";
+      lastValue = "";
+    }
+
+    function addMacro(label, keys) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "kbd-key-macro";
+      btn.textContent = label;
+      btn.onclick = function () { sendHotkey(keys); };
+      return btn;
+    }
+
+    input.oninput = function () {
+      sendDelta();
+    };
+
+    document.getElementById("send-btn").onclick = function () {
+      sendAll();
+    };
+
+    document.getElementById("enter-btn").onclick = function () {
+      sendKey("enter");
+      input.value += "\n";
+      lastValue = input.value;
+    };
+
+    document.getElementById("clear-btn").onclick = function () {
+      clearInput();
+    };
+
+    var phraseBox = document.getElementById("phrases");
+    for (var p = 0; p < phrases.length; p++) {
+      (function (phrase) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "kbd-phrase";
+        btn.textContent = phrase;
+        btn.onclick = function () {
+          input.value += phrase;
+          input.focus();
+          sendDelta();
+        };
+        phraseBox.appendChild(btn);
+      })(phrases[p]);
+    }
+
+    var macroBox = document.getElementById("macros");
+    for (var m = 0; m < macros.length; m++) {
+      macroBox.appendChild(addMacro(macros[m].label, macros[m].keys));
+    }
+
+    // Al cargar, enfocar el input para que aparezca el teclado iOS
+    setTimeout(function () {
+      input.focus();
+    }, 300);
+  </script>
+</body>
+</html>

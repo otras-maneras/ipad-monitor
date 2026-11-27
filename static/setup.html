@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>iPad Monitor — Configuración</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="topbar">
+    <a href="/">← Inicio</a>
+    <span>Configurar pantalla</span>
+    <a href="#" id="help-btn">Ayuda</a>
+    <a href="/mirror">Espejo</a>
+  </div>
+
+  <div class="help-panel hidden" id="help-panel">
+    <strong>Monitor ancho (ej. 1366×768)</strong><br>
+    <strong>Llenar</strong> recorta bordes para usar toda la pantalla del iPad.<br>
+    <strong>Ver todo</strong> muestra el monitor completo con bandas negras si hace falta.<br>
+    Para más fluidez, podés poner el monitor virtual en 1024×768.
+    <button class="btn btn-secondary help-close btn-block">Cerrar</button>
+  </div>
+
+  <div id="page-status" class="page-status"></div>
+
+  <div class="dashboard" id="setup-content">
+    <div class="note" style="margin-top:0;">
+      Los modos de ajuste se aplican al instante en el espejo. También podés cambiarlos desde <a href="/mirror">Espejo → Ajuste</a>.
+    </div>
+
+    <h2 class="section-heading">Ajuste de imagen en iPad</h2>
+    <div class="stat-grid setup-grid-3" id="fit-modes"></div>
+
+    <h2 class="section-heading">Calidad del stream</h2>
+    <div class="stat-grid setup-grid-3" id="presets"></div>
+
+    <h2 class="section-heading">Elegir monitor a transmitir</h2>
+    <div id="monitors" class="grid setup-monitors"></div>
+
+    <h2 class="section-heading">Modo presentación: elegir una ventana</h2>
+    <div class="note" style="margin-top:0;">
+      En vez de transmitir todo un monitor, podés transmitir solo una ventana del PC. Útil para presentaciones o mostrar una sola app.
+    </div>
+    <button type="button" class="btn btn-block" id="reload-windows" style="margin-bottom:12px;">🔄 Actualizar ventanas</button>
+    <div id="windows" class="grid setup-monitors"></div>
+
+    <div class="note" id="resolution-tip" style="display:none;"></div>
+
+    <div class="note" id="current-config"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    MiniPad.bindHelp("help-btn", "help-panel");
+
+    var presetLabels = {
+      ultra: "Ultra — máxima velocidad (recomendado)",
+      turbo: "Turbo — más FPS, menos calidad",
+      balanced: "Balanceado",
+      quality: "Calidad — más nitidez"
+    };
+
+    var fitLabels = {
+      fill: "Llenar iPad — sin bandas negras (puede recortar bordes)",
+      fit: "Ver todo — muestra el monitor completo (con bandas si hace falta)",
+      stretch: "Estirar — llena la pantalla pero deforma la imagen"
+    };
+
+    function isWidescreenMonitor(info) {
+      var c = info.capture || {};
+      var w = parseInt(c.width || c.target_width || 0, 10);
+      var h = parseInt(c.height || c.target_height || 0, 10);
+      if (!w || !h) return false;
+      return w / h > 1.4;
+    }
+
+    function renderFitModes(info) {
+      var box = document.getElementById("fit-modes");
+      box.innerHTML = "";
+      var modes = ["fill", "fit", "stretch"];
+      var widescreen = isWidescreenMonitor(info);
+      for (var i = 0; i < modes.length; i++) {
+        var mode = modes[i];
+        var stat = document.createElement("div");
+        var active = info.capture && info.capture.fit_mode === mode;
+        var recommended = widescreen && mode === "fit";
+        var classes = "stat stat-option";
+        if (active) classes += " stat-option-active";
+        if (recommended) classes += " stat-option-recommended";
+        stat.className = classes;
+        stat.innerHTML =
+          "<div class=\"stat-label\">" + fitLabels[mode] + "</div>" +
+          "<div class=\"stat-action\">" + (active ? "Activo" : "Activar") + "</div>";
+        stat.onclick = (function (m) {
+          return function () {
+            MiniPad.post("/api/fit/" + m, {}, function (err) {
+              if (!err) loadAll();
+            });
+          };
+        })(mode);
+        box.appendChild(stat);
+      }
+    }
+
+    function renderPresets(info) {
+      var box = document.getElementById("presets");
+      box.innerHTML = "";
+      var presets = info.presets || [];
+      for (var i = 0; i < presets.length; i++) {
+        var name = presets[i];
+        var stat = document.createElement("div");
+        var active = info.preset === name;
+        stat.className = "stat stat-option" + (active ? " stat-option-active" : "");
+        stat.innerHTML =
+          "<div class=\"stat-label\">" + (presetLabels[name] || name) + "</div>" +
+          "<div class=\"stat-action\">" + (active ? "Activo" : "Activar") + "</div>";
+        stat.onclick = (function (n) {
+          return function () {
+            MiniPad.post("/api/preset", { preset: n }, function (err) {
+              if (!err) loadAll();
+            });
+          };
+        })(name);
+        box.appendChild(stat);
+      }
+    }
+
+    function renderMonitors(monitors, activeMonitor) {
+      var box = document.getElementById("monitors");
+      box.innerHTML = "";
+
+      if (!monitors || !monitors.length) {
+        box.innerHTML = "<div class=\"note\">No se detectaron monitores. Reiniciá iPad Monitor en el PC.</div>";
+        return;
+      }
+
+      for (var i = 0; i < monitors.length; i++) {
+        var mon = monitors[i];
+        if (mon.id === 0) continue;
+
+        var card = document.createElement("div");
+        card.className = "card card-monitor";
+
+        var img = document.createElement("img");
+        img.className = "monitor-preview";
+        img.src = "/api/monitors/" + mon.id + "/preview.jpg?t=" + Date.now();
+        img.alt = mon.label || ("Monitor " + mon.id);
+
+        var title = document.createElement("h2");
+        title.textContent = mon.label || ("Monitor " + mon.id);
+
+        var meta = document.createElement("p");
+        var lw = mon.logical_width || mon.width;
+        var lh = mon.logical_height || mon.height;
+        meta.textContent = lw + " × " + lh + " px";
+        if ((mon.scale_percent || 100) > 100) {
+          meta.textContent += " · escala Windows " + mon.scale_percent + "%";
+        }
+
+        var btn = document.createElement("button");
+        btn.className = "btn btn-block";
+        btn.textContent = activeMonitor === mon.id ? "Transmitiendo este monitor" : "Usar este monitor";
+        if (activeMonitor === mon.id) {
+          btn.style.background = "#059669";
+        }
+        btn.onclick = (function (id, button) {
+          return function () {
+            button.textContent = "Aplicando…";
+            MiniPad.post("/api/capture/monitor/" + id, {}, function (err) {
+              if (err) {
+                MiniPad.showStatus("page-status", "No se pudo cambiar el monitor: " + err.message, "error");
+              }
+              loadAll();
+            });
+          };
+        })(mon.id, btn);
+
+        card.appendChild(img);
+        card.appendChild(title);
+        card.appendChild(meta);
+        card.appendChild(btn);
+        box.appendChild(card);
+      }
+    }
+
+    function renderConfig(info) {
+      var c = info.capture || {};
+      var stream = info.stream || {};
+      var stats = stream.stats || {};
+      var mode = c.mode || "monitor";
+      var modeLabel = mode === "window" ? "Ventana (modo presentación)" : "Monitor " + (c.monitor || "?");
+      document.getElementById("current-config").innerHTML =
+        "<strong>Config actual</strong><br>" +
+        "Fuente: <strong>" + modeLabel + "</strong><br>" +
+        "Captura: " + (c.width || "?") + "×" + (c.height || "?") +
+        " → iPad " + (c.target_width || 1024) + "×" + (c.target_height || 768) + "<br>" +
+        "Modo ajuste: <strong>" + (c.fit_mode || "fill") + "</strong>, " +
+        "JPEG " + (stream.jpeg_quality || "?") + ", " +
+        (stream.target_fps || "?") + " fps<br>" +
+        "Stream: " + (stats.fps_actual || "--") + " fps real";
+
+      renderResolutionTip(c);
+    }
+
+    function renderWindows(windows, activeHwnd) {
+      var box = document.getElementById("windows");
+      box.innerHTML = "";
+
+      if (!windows || !windows.length) {
+        box.innerHTML = "<div class=\"note\">No se encontraron ventanas visibles. Asegurate de tener alguna ventana abierta.</div>";
+        return;
+      }
+
+      for (var i = 0; i < windows.length; i++) {
+        var win = windows[i];
+        var card = document.createElement("div");
+        card.className = "card card-monitor";
+
+        var img = document.createElement("img");
+        img.className = "monitor-preview";
+        img.src = "/api/windows/" + win.hwnd + "/preview.jpg?t=" + Date.now();
+        img.alt = win.title;
+
+        var title = document.createElement("h2");
+        title.textContent = win.title;
+        title.style.fontSize = "15px";
+        title.style.overflow = "hidden";
+        title.style.textOverflow = "ellipsis";
+        title.style.whiteSpace = "nowrap";
+
+        var meta = document.createElement("p");
+        meta.textContent = win.width + " × " + win.height + " px";
+
+        var btn = document.createElement("button");
+        btn.className = "btn btn-block";
+        var isActive = activeHwnd && activeHwnd === win.hwnd;
+        btn.textContent = isActive ? "Transmitiendo esta ventana" : "Usar esta ventana";
+        if (isActive) {
+          btn.style.background = "#059669";
+        }
+        btn.onclick = (function (hwnd, button) {
+          return function () {
+            button.textContent = "Aplicando…";
+            MiniPad.post("/api/capture/window", { hwnd: hwnd }, function (err) {
+              if (err) {
+                MiniPad.showStatus("page-status", "No se pudo cambiar la ventana: " + err.message, "error");
+              }
+              loadAll();
+            });
+          };
+        })(win.hwnd, btn);
+
+        card.appendChild(img);
+        card.appendChild(title);
+        card.appendChild(meta);
+        card.appendChild(btn);
+        box.appendChild(card);
+      }
+    }
+
+    function loadWindows(activeHwnd) {
+      MiniPad.get("/api/windows", function (err, windows) {
+        if (err) {
+          document.getElementById("windows").innerHTML = "<div class=\"note\">No se pudieron cargar las ventanas.</div>";
+          return;
+        }
+        renderWindows(windows, activeHwnd);
+      });
+    }
+
+    function renderResolutionTip(c) {
+      var tip = document.getElementById("resolution-tip");
+      var w = parseInt(c.width || 0, 10);
+      var h = parseInt(c.height || 0, 10);
+      if (!w || !h) {
+        tip.style.display = "none";
+        return;
+      }
+      var ratio = w / h;
+      if (ratio > 1.4) {
+        tip.style.display = "block";
+        tip.innerHTML =
+          "<strong>Monitor ancho (" + w + "×" + h + ")</strong><br>" +
+          "Para aprovechar todo el iPad sin bandas negras, el monitor virtual debería ser <strong>1024×768</strong>. " +
+          "En el PC ejecutá <code>scripts\\set-resolution.bat</code> si tu driver lo permite.";
+      } else {
+        tip.style.display = "none";
+      }
+    }
+
+    function loadAll() {
+      MiniPad.get("/api/info", function (err, info) {
+        if (err || !info || !info.capture) {
+          MiniPad.showStatus(
+            "page-status",
+            "No se pudo cargar la configuración. " + (err ? err.message : "Respuesta vacía"),
+            "error"
+          );
+          return;
+        }
+
+        MiniPad.showStatus("page-status", "", "info");
+        renderFitModes(info);
+        renderPresets(info);
+        renderMonitors(info.monitors, info.capture.monitor);
+        renderConfig(info);
+        loadWindows(info.hwnd);
+      });
+    }
+
+    document.getElementById("reload-windows").onclick = function () {
+      MiniPad.get("/api/info", function (err, info) {
+        loadWindows(info && info.hwnd ? info.hwnd : null);
+      });
+    };
+
+    loadAll();
+  </script>
+</body>
+</html>

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>iPad Monitor — Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="topbar" id="topbar">
+    <a href="/">← Inicio</a>
+    <span>Dashboard del PC</span>
+    <a href="#" id="help-btn">Ayuda</a>
+    <a href="#" id="fullscreen-btn">Pantalla completa</a>
+  </div>
+
+  <div class="help-panel hidden" id="help-panel">
+    Panel con stats del PC en tiempo real. <strong>Pantalla completa</strong> oculta la barra de iPad Monitor. Para quitar la barra de Safari: Compartir → Agregar a pantalla de inicio → abrir desde el ícono.
+    <button class="btn btn-secondary help-close btn-block">Cerrar</button>
+  </div>
+
+  <div class="dashboard">
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="date-line" id="date">---</div>
+
+    <div class="section-title">Sistema</div>
+    <div class="stat-grid">
+      <div class="stat stat-wide">
+        <div class="stat-label">Equipo</div>
+        <div class="stat-value-sm" id="hostname">--</div>
+        <div class="stat-detail" id="os-info">--</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Tiempo activo</div>
+        <div class="stat-value-sm" id="uptime">--</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Procesos</div>
+        <div class="stat-value-sm" id="process-count">--</div>
+      </div>
+    </div>
+
+    <div class="section-title">Procesador</div>
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="stat-label">CPU total</div>
+        <div class="stat-value" id="cpu">--%</div>
+        <div class="stat-detail" id="cpu-detail">--</div>
+      </div>
+      <div class="stat stat-wide" id="cpu-cores"></div>
+    </div>
+
+    <div class="section-title">Memoria</div>
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="stat-label">RAM</div>
+        <div class="stat-value" id="ram">--%</div>
+        <div class="stat-detail" id="ram-detail">--</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Swap</div>
+        <div class="stat-value-sm" id="swap">--</div>
+        <div class="stat-detail" id="swap-detail">--</div>
+      </div>
+    </div>
+
+    <div class="section-title">Almacenamiento</div>
+    <div class="stat-grid" id="disks"></div>
+
+    <div class="section-title">Red</div>
+    <div class="stat-grid">
+      <div class="stat stat-wide">
+        <div class="stat-label">IP principal</div>
+        <div class="stat-value-sm" id="ip-main">--</div>
+        <div class="stat-detail" id="ip-list">--</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Descargado</div>
+        <div class="stat-value-sm" id="net-down">--</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Subido</div>
+        <div class="stat-value-sm" id="net-up">--</div>
+      </div>
+    </div>
+
+    <div class="section-title">Energía</div>
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="stat-label">Batería</div>
+        <div class="stat-value" id="battery">--</div>
+        <div class="stat-detail" id="battery-detail">--</div>
+      </div>
+      <div class="stat stat-wide" id="temps"></div>
+    </div>
+
+    <div class="section-title">Top procesos</div>
+    <div class="stat stat-wide" id="processes" style="margin:8px;"></div>
+
+    <div class="section-title">iPad Monitor</div>
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="stat-label">Stream FPS</div>
+        <div class="stat-value-sm" id="stream-fps">--</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Frame</div>
+        <div class="stat-value-sm" id="stream-size">--</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    MiniPad.bindHelp("help-btn", "help-panel");
+
+    var days = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    var months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+    function pad(n) {
+      return n < 10 ? "0" + n : "" + n;
+    }
+
+    function colorForPercent(value) {
+      if (value < 60) return "status-ok";
+      if (value < 85) return "status-warn";
+      return "status-bad";
+    }
+
+    function setText(id, value) {
+      document.getElementById(id).textContent = value;
+    }
+
+    function setHtml(id, value) {
+      document.getElementById(id).innerHTML = value;
+    }
+
+    function updateClock() {
+      var now = new Date();
+      setText("clock", pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds()));
+      setText("date", days[now.getDay()] + " " + now.getDate() + " " + months[now.getMonth()] + " " + now.getFullYear());
+    }
+
+    function renderCpuCores(cores) {
+      var box = document.getElementById("cpu-cores");
+      if (!cores || !cores.length) {
+        box.innerHTML = "<div class=\"stat-label\">Núcleos</div><div class=\"stat-detail\">No disponible</div>";
+        return;
+      }
+
+      var html = "<div class=\"stat-label\">Núcleos</div>";
+      for (var i = 0; i < cores.length; i++) {
+        html += "<div class=\"stat-detail\">Core " + (i + 1) + ": " + cores[i] + "%</div>";
+        html += "<div class=\"core-bar\"><div class=\"core-bar-fill\" style=\"width:" + cores[i] + "%;\"></div></div>";
+      }
+      box.innerHTML = html;
+    }
+
+    function renderDisks(disks) {
+      var box = document.getElementById("disks");
+      box.innerHTML = "";
+      if (!disks || !disks.length) {
+        box.innerHTML = "<div class=\"stat\"><div class=\"stat-detail\">Sin datos de disco</div></div>";
+        return;
+      }
+
+      for (var i = 0; i < disks.length; i++) {
+        var disk = disks[i];
+        var el = document.createElement("div");
+        el.className = "stat";
+        el.innerHTML =
+          "<div class=\"stat-label\">" + disk.mount + " (" + disk.device + ")</div>" +
+          "<div class=\"stat-value " + colorForPercent(disk.percent) + "\">" + Math.round(disk.percent) + "%</div>" +
+          "<div class=\"stat-detail\">" + disk.used_human + " / " + disk.total_human + " · libre " + disk.free_human + "</div>";
+        box.appendChild(el);
+      }
+    }
+
+    function renderTemps(temps) {
+      var box = document.getElementById("temps");
+      if (!temps || !temps.length) {
+        box.innerHTML = "<div class=\"stat-label\">Temperaturas</div><div class=\"stat-detail\">No disponible en este equipo</div>";
+        return;
+      }
+
+      var html = "<div class=\"stat-label\">Temperaturas</div>";
+      for (var i = 0; i < temps.length; i++) {
+        html += "<div class=\"stat-detail\">" + temps[i].label + ": " + temps[i].current + " °C</div>";
+      }
+      box.innerHTML = html;
+    }
+
+    function renderProcesses(items) {
+      var box = document.getElementById("processes");
+      if (!items || !items.length) {
+        box.innerHTML = "<div class=\"stat-detail\">Sin procesos</div>";
+        return;
+      }
+
+      var html = "";
+      for (var i = 0; i < items.length; i++) {
+        var p = items[i];
+        html += "<div class=\"process-row\"><span>" + p.name + " (#" + p.pid + ")</span><span>CPU " +
+          Math.round(p.cpu_percent) + "% · RAM " + p.memory_percent + "%</span></div>";
+      }
+      box.innerHTML = html;
+    }
+
+    function updateStats() {
+      MiniPad.get("/api/stats", function (err, data) {
+        if (err || !data) return;
+
+        setText("hostname", data.hostname || "--");
+        setText("os-info", (data.os || "") + " " + (data.os_release || "") + " · " + (data.architecture || ""));
+        setText("uptime", data.uptime_human || "--");
+        setText("process-count", String(data.process_count || 0));
+
+        var cpuEl = document.getElementById("cpu");
+        cpuEl.textContent = Math.round(data.cpu.percent) + "%";
+        cpuEl.className = "stat-value " + colorForPercent(data.cpu.percent);
+        setText("cpu-detail", (data.cpu.cores_logical || 0) + " hilos · " + (data.cpu.freq_mhz || "?") + " MHz");
+        renderCpuCores(data.cpu.per_core || []);
+
+        var ramEl = document.getElementById("ram");
+        ramEl.textContent = Math.round(data.memory.percent) + "%";
+        ramEl.className = "stat-value " + colorForPercent(data.memory.percent);
+        setText("ram-detail", data.memory.used_human + " / " + data.memory.total_human + " · libre " + data.memory.available_human);
+        setText("swap", Math.round(data.memory.swap_percent) + "%");
+        setText("swap-detail", data.memory.swap_used_human + " / " + data.memory.swap_total_human);
+
+        renderDisks(data.disks || []);
+
+        setText("ip-main", (data.network && data.network.preferred_ip) || "--");
+        setText("ip-list", (data.network && data.network.local_ips) ? data.network.local_ips.join(", ") : "--");
+        setText("net-down", (data.network && data.network.bytes_recv_human) || "--");
+        setText("net-up", (data.network && data.network.bytes_sent_human) || "--");
+
+        var batEl = document.getElementById("battery");
+        if (!data.battery) {
+          batEl.textContent = "Escritorio";
+          batEl.className = "stat-value";
+          setText("battery-detail", "Sin batería detectada");
+        } else {
+          batEl.textContent = Math.round(data.battery.percent) + "%";
+          batEl.className = "stat-value " + colorForPercent(100 - data.battery.percent);
+          var detail = data.battery.plugged ? "Enchufado" : "Con batería";
+          if (data.battery.time_left_human) {
+            detail += " · " + data.battery.time_left_human + " restante";
+          }
+          setText("battery-detail", detail);
+        }
+
+        renderTemps(data.temperatures || []);
+        renderProcesses(data.top_processes || []);
+
+        if (data.stream) {
+          setText("stream-fps", String(data.stream.fps_actual || 0));
+          setText("stream-size", Math.round((data.stream.frame_bytes || 0) / 1024) + " KB");
+        }
+      });
+    }
+
+    updateClock();
+    updateStats();
+    setInterval(updateClock, 1000);
+    setInterval(updateStats, 5000);
+
+    document.getElementById("fullscreen-btn").onclick = function (e) {
+      e.preventDefault();
+      MiniPad.toggleImmersive(document.body, document.getElementById("topbar"));
+    };
+  </script>
+</body>
+</html>

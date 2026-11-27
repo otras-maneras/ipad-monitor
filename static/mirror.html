@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es" class="mirror-root">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>iPad Monitor — Espejo</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="mirror-body">
+  <div class="mirror-viewport">
+    <img id="mirror" class="mirror-img mirror-img-fit" alt="">
+  </div>
+
+  <div id="mirror-status" class="mirror-status">Conectando…</div>
+
+  <div class="mirror-hud">
+    <span id="fps-label">-- fps</span>
+    <a href="#" id="fit-btn">Ajuste</a>
+    <a href="/setup">⚙</a>
+  </div>
+
+  <div class="fit-menu hidden" id="fit-menu">
+    <button type="button" class="fit-btn" data-fit="fill">Llenar</button>
+    <button type="button" class="fit-btn" data-fit="fit">Ver todo</button>
+    <button type="button" class="fit-btn" data-fit="stretch">Estirar</button>
+  </div>
+
+  <a href="/" class="mirror-menu-btn">☰ Inicio</a>
+  <a href="/keyboard" class="kiosk-keyboard" style="right:80px;" title="Teclado">⌨</a>
+
+  <script src="/static/app.js"></script>
+  <script src="/static/mirror-core.js"></script>
+  <script>
+    MiniPadMirror.init({
+      kiosk: false,
+      fpsId: "fps-label",
+      fitMenuId: "fit-menu",
+      fitBtnId: "fit-btn",
+    });
+  </script>
+</body>
+</html>

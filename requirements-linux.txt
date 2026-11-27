@@ -1,0 +1,9 @@
+# Linux/X11. FFmpeg (con x11grab y libx264) se instala aparte con el gestor de
+# paquetes. Los controles usan libXtst por ctypes.
+# Emisor H.264 para el visor nativo:
+mss>=9.0.1
+Pillow>=10.0.0
+# Modo web (opcional, `python run.py`):
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+psutil>=5.9.0

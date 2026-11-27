@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>iPad Monitor — Control</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="touchpad-body">
+  <div class="topbar touchpad-topbar">
+    <a href="/">← Inicio</a>
+    <span>Control</span>
+    <span id="status" class="touch-status">Listo</span>
+  </div>
+
+  <div class="remote-bar">
+    <div class="remote-row">
+      <button type="button" class="remote-btn" data-media="prev" title="Anterior">⏮</button>
+      <button type="button" class="remote-btn remote-btn-main" data-media="playpause" title="Play/Pausa">⏯</button>
+      <button type="button" class="remote-btn" data-media="next" title="Siguiente">⏭</button>
+      <button type="button" class="remote-btn" data-media="down" title="Bajar volumen">🔉</button>
+      <button type="button" class="remote-btn" data-media="mute" title="Silencio">🔇</button>
+      <button type="button" class="remote-btn" data-media="up" title="Subir volumen">🔊</button>
+      <button type="button" class="remote-btn" data-key="win" title="Windows">Win</button>
+      <button type="button" class="remote-btn" data-key="esc" title="Escape">Esc</button>
+      <button type="button" class="remote-btn" data-hotkey="alt,tab" title="Cambiar app">Tab</button>
+      <button type="button" class="remote-btn" data-hotkey="ctrl,c" title="Copiar">C</button>
+      <button type="button" class="remote-btn" data-hotkey="ctrl,v" title="Pegar">V</button>
+      <button type="button" class="remote-btn" data-key="enter" title="Enter">↵</button>
+    </div>
+  </div>
+
+  <div class="touch-area" id="pad">
+    <div class="touch-hint" id="hint">Tocar: clic · Mover: cursor · Mantener: arrastrar · 2 dedos: scroll · Pellizco: zoom</div>
+  </div>
+
+  <div class="touch-controls">
+    <button type="button" class="btn" id="click-left">Clic izq.</button>
+    <button type="button" class="btn btn-secondary" id="click-right">Clic der.</button>
+    <button type="button" class="btn btn-secondary" id="dbl-click">Doble clic</button>
+    <a class="btn btn-secondary" href="/kiosk">▣ Espejo</a>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    var pad = document.getElementById("pad");
+    var hint = document.getElementById("hint");
+    var statusEl = document.getElementById("status");
+
+    var MOVE_GAIN = 28;
+    var LONG_PRESS_MS = 400;
+    var SEND_INTERVAL_MS = 16;
+
+    var moveQueue = [];
+    var sending = false;
+    var sendTimer = null;
+
+    var lastX = null;
+    var lastY = null;
+    var lastPinchDist = null;
+    var lastScrollY = null;
+
+    var longPressTimer = null;
+    var isDragging = false;
+    var dragPending = false;
+    var tapStartX = 0;
+    var tapStartY = 0;
+    var hasMoved = false;
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    function flushMoves() {
+      if (sending || !moveQueue.length) return;
+      sending = true;
+      var batch = moveQueue;
+      moveQueue = [];
+      var dx = 0;
+      var dy = 0;
+      for (var i = 0; i < batch.length; i++) {
+        dx += batch[i].dx;
+        dy += batch[i].dy;
+      }
+      MiniPad.post("/api/pointer/move", { dx: dx, dy: dy }, function () {
+        sending = false;
+        if (moveQueue.length) flushMoves();
+      });
+    }
+
+    function queueMove(dx, dy) {
+      moveQueue.push({ dx: dx, dy: dy });
+      if (!sendTimer) {
+        sendTimer = setInterval(function () {
+          flushMoves();
+          if (!moveQueue.length) {
+            clearInterval(sendTimer);
+            sendTimer = null;
+          }
+        }, SEND_INTERVAL_MS);
+      }
+    }
+
+    function touchDistance(t1, t2) {
+      var dx = t2.clientX - t1.clientX;
+      var dy = t2.clientY - t1.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function sendClick(button) {
+      MiniPad.post("/api/pointer/click", { button: button }, function () { setStatus("Listo"); });
+    }
+
+    function startDrag() {
+      if (isDragging) return;
+      isDragging = true;
+      dragPending = false;
+      setStatus("Arrastrar");
+      sendClick("left");
+    }
+
+    function endDrag() {
+      if (!isDragging) return;
+      isDragging = false;
+      setStatus("Listo");
+      sendClick("left");
+    }
+
+    function bindRemoteButtons() {
+      var buttons = document.querySelectorAll(".remote-btn");
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].onclick = (function (btn) {
+          return function () {
+            var media = btn.getAttribute("data-media");
+            var key = btn.getAttribute("data-key");
+            var hotkey = btn.getAttribute("data-hotkey");
+            if (media) {
+              MiniPad.post("/api/media/" + media, {}, function () {});
+            } else if (hotkey) {
+              MiniPad.post("/api/hotkey", { keys: hotkey.split(",") }, function () {});
+            } else if (key) {
+              MiniPad.post("/api/key", { key: key }, function () {});
+            }
+          };
+        })(buttons[i]);
+      }
+    }
+
+    pad.addEventListener("touchstart", function (e) {
+      e.preventDefault();
+
+      if (e.touches.length === 1) {
+        var touch = e.touches[0];
+        lastX = touch.clientX;
+        lastY = touch.clientY;
+        tapStartX = touch.clientX;
+        tapStartY = touch.clientY;
+        lastPinchDist = null;
+        lastScrollY = null;
+        hasMoved = false;
+        dragPending = true;
+        setStatus("Mover");
+        hint.style.opacity = "0";
+
+        if (longPressTimer) clearTimeout(longPressTimer);
+        longPressTimer = setTimeout(function () {
+          if (dragPending && !hasMoved) {
+            startDrag();
+          }
+        }, LONG_PRESS_MS);
+      } else if (e.touches.length === 2) {
+        lastX = null;
+        lastY = null;
+        dragPending = false;
+        if (longPressTimer) clearTimeout(longPressTimer);
+        if (isDragging) endDrag();
+        lastPinchDist = touchDistance(e.touches[0], e.touches[1]);
+        lastScrollY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        setStatus("Scroll / zoom");
+      }
+    }, false);
+
+    pad.addEventListener("touchmove", function (e) {
+      e.preventDefault();
+
+      if (e.touches.length === 1 && lastX !== null) {
+        var touch = e.touches[0];
+        var dx = (touch.clientX - lastX) / pad.clientWidth;
+        var dy = (touch.clientY - lastY) / pad.clientHeight;
+        lastX = touch.clientX;
+        lastY = touch.clientY;
+
+        var moveDist = Math.sqrt(dx * dx + dy * dy);
+        if (moveDist > 0.0003) {
+          hasMoved = true;
+          queueMove(dx * MOVE_GAIN, dy * MOVE_GAIN);
+        }
+
+        if (dragPending && hasMoved) {
+          dragPending = false;
+          if (longPressTimer) clearTimeout(longPressTimer);
+        }
+        return;
+      }
+
+      if (e.touches.length === 2) {
+        var dist = touchDistance(e.touches[0], e.touches[1]);
+        var midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+        if (lastPinchDist !== null) {
+          var pinchDelta = dist - lastPinchDist;
+          if (Math.abs(pinchDelta) > 3) {
+            var zoomAmount = pinchDelta > 0 ? 6 : -6;
+            MiniPad.post("/api/pointer/zoom", { amount: zoomAmount }, function () {});
+            lastPinchDist = dist;
+            setStatus("Zoom");
+            return;
+          }
+        }
+
+        if (lastScrollY !== null) {
+          var scrollDelta = lastScrollY - midY;
+          if (Math.abs(scrollDelta) > 1) {
+            var amount = scrollDelta > 0 ? 10 : -10;
+            if (Math.abs(scrollDelta) > 8) {
+              amount = scrollDelta > 0 ? 16 : -16;
+            }
+            MiniPad.post("/api/pointer/scroll", { amount: amount }, function () {});
+            lastScrollY = midY;
+            setStatus("Scroll");
+          }
+        }
+      }
+    }, false);
+
+    pad.addEventListener("touchend", function (e) {
+      if (longPressTimer) clearTimeout(longPressTimer);
+
+      if (e.touches.length === 0) {
+        if (isDragging) {
+          endDrag();
+        } else if (dragPending && !hasMoved) {
+          sendClick("left");
+        }
+
+        lastX = null;
+        lastY = null;
+        lastPinchDist = null;
+        lastScrollY = null;
+        dragPending = false;
+        hasMoved = false;
+        setStatus("Listo");
+        hint.style.opacity = "1";
+      } else if (e.touches.length === 1) {
+        lastX = e.touches[0].clientX;
+        lastY = e.touches[0].clientY;
+        lastPinchDist = null;
+        lastScrollY = null;
+        dragPending = true;
+        hasMoved = false;
+        setStatus("Mover");
+        longPressTimer = setTimeout(function () {
+          if (dragPending && !hasMoved) startDrag();
+        }, LONG_PRESS_MS);
+      }
+    }, false);
+
+    document.getElementById("click-left").onclick = function () { sendClick("left"); };
+    document.getElementById("click-right").onclick = function () { sendClick("right"); };
+    document.getElementById("dbl-click").onclick = function () {
+      sendClick("left");
+      setTimeout(function () { sendClick("left"); }, 80);
+    };
+
+    bindRemoteButtons();
+  </script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+# Entornos y cachés
+.venv/
+.venv-linux/
+__pycache__/
+*.pyc
+
+# Configuración local (se crea desde config.example.json)
+config.json
+
+# Contenido personal de la biblioteca: solo se versionan los README
+library/*
+!library/README.md
+!library/videos/
+library/videos/*
+!library/videos/README.md
+
+# Binarios y descargas de terceros: se enlazan en el README
+*.exe
+*.pdb
+*.zip
+*.deb
+Dependencies/
+SignedDrivers/
+
+# Compilación del visor
+native/ios/.theos/
+native/ios/packages/
+native/ios/obj/
+
+# Capturas de prueba y archivos del sistema
+test_*.jpg
+.DS_Store
+Thumbs.db
+
+# Notas privadas (servidor, publicación)
+docs/privado/
+
+# Entorno de compilación local del visor (native/COMPILAR.md)
+native/theos/
+native/bin/
+native/tmp/
+native/sdks-src/
+native/toolchain.tar.xz
+native/verify.*/
